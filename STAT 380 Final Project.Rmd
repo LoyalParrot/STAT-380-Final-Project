@@ -1,6 +1,6 @@
 ---
 title: "STAT 380 Final Project"
-author: "Ishan Agrahar, Jake Sturges, Noah Tobias, Prajwal Bhandari"
+author: "Ishan Agrahar, Noah Tobias, Matt Collins"
 date: "2025-12-04"
 output: html_document
 ---
@@ -9,22 +9,310 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Front Matter
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+rm(list=ls())
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Libraries
+library(tidyverse)
+library(kableExtra)
 
-```{r cars}
-summary(cars)
+# Dataset Read-in
+CODModes <- read.csv("Raw Data/CODGameModes.csv")
+CODGamesP1 <- read.csv("Raw Data/CODGames_p1_380.csv")
+CODGamesP2 <- read.csv("Raw Data/CODGames_p2_380.csv")
+CODMaps <- read.csv("Raw Data/CODMaps.csv")
 ```
 
-## Including Plots
+## Quick Dataset Checking
 
-You can also embed plots, for example:
+### Modes Dataset
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+str(CODModes)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+### Player 1 Games Dataset
+
+```{r}
+str(CODGamesP1)
+```
+
+### Player 2 Games Dataset
+
+```{r}
+str(CODGamesP2)
+```
+
+### Maps Dataset
+
+```{r}
+str(CODMaps)
+```
+Looking through the data overviews, I do not see any concerns.
+
+## Combining Player Data
+
+Looking at both the Player 1 and Player 2 datasets, it seems that they have the same column names so I will just add a row denoting player 1 or player 2 and perform a row bind.
+
+```{r}
+CODGamesAllPlayers <- 
+  rbind(CODGamesP1 %>% mutate(playerNum = 1),
+        CODGamesP2 %>% mutate(playerNum = 2))
+```
+
+### Checking Dataset
+
+```{r}
+str(CODGamesAllPlayers)
+```
+
+Looking at the dataset overview, I see no concerns as 839 observations = 589 obs. (from player 1) + 250 obs.(from player 2).
+
+## Task #1
+
+The research question for this task is: Which maps are the most likely to win the map vote when they are an option?
+
+According to the relevant information part of the instruction guide, players are given two choices represented in the `Map1` and `Map2` variables. There also is a `MapVote` variable which shows the voting tally and can also serve as a filter of that which there are no player votes. The winning map vote is then placed in the `Choice` variable. Also according to the problem guidance, there is data quality issues. Focusing on the variables above, the first step I must take is to fix the data quality issues. To address this I will first look at if there are missing values in any of these columns and likely remove them. Then I shall at each of the unique data observations to see if there is spelling issues. I will validate this by looking at the differences between the CODMaps Names that are apparently all correct. Note: I do recognize that we: "should consider whether a given map won the vote by getting more votes than the other option or if it was selected since it was `Map1` and the vote was a tie." It is evident from the research question that we need to consider maps that win the map vote. If a map did not win as a result of a map vote, that is outside the scope of our research question and therefore all blank entries as well as ties must be removed. That should alleviate data quality concerns hopefully. The second step would then be to use the hint given in the document to make a: "table in your report showing the name of the map, the number of times it was a candidate, the number of times it won the vote, and the proportion/probability." The number of times a map appears as a candidate and number of times it won are simply a matter of making the data into a 0 or 1, or True or False thing of is it a map name and then simply summing across respective column. As such, the answer to the research question should be based on that proportion/probability of how many times a map won its vote. The most likely is a subjective number where I will simply present a table of the proportions from largest to smallest where the viewer can be like I consider this many to be the most likely number of maps.
+
+### Data Cleaning
+
+First I will check if there is NA's
+
+```{r}
+sum(is.na(CODGamesAllPlayers$Map1))
+sum(is.na(CODGamesAllPlayers$Map2))
+sum(is.na(CODGamesAllPlayers$MapVote))
+sum(is.na(CODGamesAllPlayers$Choice))
+```
+
+There are no NA's in the data
+
+Next I will check the differences between the map names in these categories with the correct ones from the COD MAPS dataset.
+
+```{r}
+setdiff(CODGamesAllPlayers$Map1, CODMaps$Name)
+setdiff(CODGamesAllPlayers$Map2, CODMaps$Name)
+setdiff(CODGamesAllPlayers$Choice, CODMaps$Name)
+```
+
+Looking like there are "" instead of NAs. I will manually correct the all of those wrong names.
+
+Correct Map Names are as follows
+
+```{r}
+data.frame(Names = CODMaps$Name) %>%
+  arrange(Names) %>%
+  kable()
+```
+
+#### Manual Correction
+
+NOTE I WILL CLEAN AND NAME THE DATASET `CODGamesAllPlayersCleaned`!
+
+##### Map1 Variable
+
+Differences are:
+
+```{r}
+setdiff(CODGamesAllPlayers$Map1, CODMaps$Name)
+```
+
+Using my best guess of what they are:
+
+```{r}
+CODGamesAllPlayersCleaned <- CODGamesAllPlayers %>%
+  filter(Map1 != "")
+
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Jungle "] <- "Jungle"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Ruah"] <- "Rush"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Collateral"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Riad"] <- "Raid"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Miami "] <- "Miami"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Collateral Striek"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Miami Stirke"] <- "Miami Strike"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Collaterol Strike"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Drive-in"] <- "Drive-In"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Deprogam"] <- "Deprogram"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Rush "] <- "Rush"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Zoo "] <- "Zoo"
+CODGamesAllPlayersCleaned$Map1[CODGamesAllPlayersCleaned$Map1 == "Raid "] <- "Raid"
+```
+
+Checking if I got all of them
+
+```{r}
+setdiff(CODGamesAllPlayersCleaned$Map1, CODMaps$Name)
+```
+
+Yay!
+
+##### Map2 Variable
+
+Differences are:
+
+```{r}
+setdiff(CODGamesAllPlayersCleaned$Map2, CODMaps$Name)
+```
+
+Using my best guess of what they are:
+
+```{r}
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Miami Stirke"] <- "Miami Strike"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Collateral"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "yamantau"] <- "Yamantau"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Drive-in"] <- "Drive-In"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Nuketown '84 Halloween"] <- "Nuketown '84"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Miami Sstrike"] <- "Miami Strike"
+CODGamesAllPlayersCleaned$Map2[CODGamesAllPlayersCleaned$Map2 == "Amrada Strike"] <- "Armada Strike"
+```
+
+Checking if I got all of them
+
+```{r}
+setdiff(CODGamesAllPlayersCleaned$Map2, CODMaps$Name)
+```
+
+Yay!
+
+##### Choice Variable
+
+Differences are:
+
+```{r}
+setdiff(CODGamesAllPlayersCleaned$Choice, CODMaps$Name)
+```
+
+Using my best guess of what they are:
+
+```{r}
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Apocolypse"] <- "Apocalypse"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Collateral"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "APocalypse"] <- "Apocalypse"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Drive-in"] <- "Drive-In"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Collaterel Strike"] <- "Collateral Strike"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Nuketown '84 Halloween"] <- "Nuketown '84"
+CODGamesAllPlayersCleaned$Choice[CODGamesAllPlayersCleaned$Choice == "Deisel"] <- "Diesel"
+```
+
+Checking if I got all of them
+
+```{r}
+setdiff(CODGamesAllPlayersCleaned$Choice, CODMaps$Name)
+```
+
+Yay!
+
+#### Remove Ties & No Votes
+
+First checking the unique values if there are any NAs or "".
+
+```{r}
+unique(CODGamesAllPlayersCleaned$MapVote)
+```
+
+There does not seem to be any missing votes here so I can proceed to removing Ties, however, I do see that in some of them there is an inconsistent delimiter. I can see a pattern though that there is only single digit votes and therefore the numbers I need are the first character and the last character.
+
+I realistically do not care who wins the vote and only care if the first and last numbers are the same. So there is no need to store the numbers and I will just do a comparison in a filter. I have no clue how to get the first and last characters of a string in R because in python it would be intuitive as a string is an iterable and I could index at 0 and -1 but for whatever reason R is not the same :(. I therefore searched how do I get the first and last letter of a string in r on google and got the str_sub function from tidyverse as the solution.
+
+```{r}
+CODGamesAllPlayersCleaned <-
+  CODGamesAllPlayersCleaned %>%
+  filter(
+    str_sub(CODGamesAllPlayersCleaned$MapVote, 1, 1) !=
+      str_sub(CODGamesAllPlayersCleaned$MapVote, -1, -1)
+    )
+```
+
+Checking if it worked
+
+```{r}
+unique(CODGamesAllPlayersCleaned$MapVote)
+```
+
+It worked, yay!
+
+That should hopefully conclude the data cleaning part.
+
+### Table of Map Candidacy and Chosen Rate
+
+First I need to identify the number of times a map is a candidate. This can probably be done through a summarize on `Map1` and `Map2` then joining those tables and once again summarize.
+
+```{r}
+CandicacyMap <- full_join(
+  CODGamesAllPlayersCleaned %>% group_by(Map1) %>% summarize(n = n()),
+  CODGamesAllPlayersCleaned %>% group_by(Map2) %>% summarize(n = n()),
+  by = join_by(Map1 == Map2))
+
+CandicacyMap %>% kable()
+```
+
+All 28 maps are accounted for yay! Now I just need to sum the numbers for total candidacy.
+
+```{r}
+CandicacyMap <- 
+  CandicacyMap %>%
+  mutate(TotalCandidacies = n.x + n.y) %>%
+  select(Map1, TotalCandidacies) %>%
+  rename(MapName = Map1)
+
+CandicacyMap %>% kable()
+```
+
+Now I need to get the number of times a map won from `Choice`. This is also probably through summarize but I'll just directly join it.
+
+```{r}
+CandicacyMap <- 
+  full_join(
+    CandicacyMap,
+    CODGamesAllPlayersCleaned %>% group_by(Choice) %>% summarize(NumberOfSelections = n()),
+    by = join_by(MapName == Choice)
+  )
+
+CandicacyMap %>% kable()
+```
+
+To validate whether this is done correctly, it must be noted that the number of selections must be half that of the candidacies. I can't really check otherwise except manually if there is actual matches but I am like trusting in myself and my algorithmic design skills that that part is correct.
+
+If the below is TRUE, I am declaring validation!
+
+```{r}
+sum(CandicacyMap$TotalCandidacies) / 2 == sum(CandicacyMap$NumberOfSelections)
+```
+
+Yay!
+
+The last thing to do here is make the proportions (selections divided by candidacies) and then sort them. I'm also gonna change the order of selections and candidacies to make the table look more intuitive.
+
+```{r}
+CandicacyMap <- 
+  CandicacyMap %>%
+  mutate(ProportionOfSelection = round(NumberOfSelections / TotalCandidacies, 4)) %>%
+  arrange(desc(ProportionOfSelection)) %>%
+  select(MapName, NumberOfSelections, TotalCandidacies, ProportionOfSelection)
+
+CandicacyMap %>% kable()
+```
+
+The last step here is to make a visualization of this information on the `ProportionOfSelection`. Since we are looking at the spread of categorical data, I am just going to use a barplot.
+
+```{r}
+# For the axis labels layer, I took that line from my (Ishan) Mini-Project 1
+ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
+  geom_col(color = "black", fill = "forestgreen") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + # Note this line was taken from: https://www.statology.org/rotate-axis-labels-ggplot2/
+  xlab("Map Name") +
+  ylab("Proportion of Times Winning Map Vote") +
+  ggtitle("Proportion a Map wins a Map Vote when an Option")
+```
+
+### Research Question Answer
+
+Looking mostly at the table since it is easier to look through since it is arranged, it looks like `Nuketown ’84` is the most likely to be picked, followed by `Raid`, followed by `Crossroads Strike`, continue this train of thought till you reach your desired however many is the likely number you would like.
+
+## Task #2
+
+## Task #3
+
+## Task #4
