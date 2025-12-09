@@ -1475,6 +1475,223 @@ reach your desired however many is the likely number you would like.</p>
 </div>
 <div id="task-2" class="section level2">
 <h2>Task #2</h2>
+<p>For this question I used the AI model of Gemini 3.0</p>
+<p>You may find the exact prompt and reponses from Gemini at the
+following link: <a href="https://gemini.google.com/share/7c470706e207" class="uri">https://gemini.google.com/share/7c470706e207</a></p>
+<div id="prompts" class="section level3">
+<h3>Prompts</h3>
+<p>The first prompt that I gave R was as follows:</p>
+<p>NOTE: I also provided Gemini with the csv files of
+CODGames_p1_380.csv, CODGames_p2_380.csv, and CODMaps.csv</p>
+<pre><code>Consider the following
+
+
+
+Relevant Information: Prior to each online match, players in the game lobby are presented with two options for the battlefield of the upcoming game (`Map1` and `Map2`). The players have the option to vote, and the resulting vote is recorded in the `MapVote` column. The winning map is listed in the `Choice` column. In the event of a tie vote, the map listed in `Map1` is chosen. (Games for which the player entered the lobby after the vote has taken place have no information in `Map1` and `Map2` but have the winning map presented in `Choice`.) Research Question: Which maps are the most likely to win the map vote when they are an option? Notes: To answer this question, write a paragraph (or more) discussing how you plan to answer this question. Be sure to address the data quality issues mentioned below and discuss how you will do the calculations. Then, write code and answer the question. (If I must answer questions about your approach/decision making process by reading your code rather than your discussion, you will lose points.) As part of your solution, you should calculate the proportion/probability that a map wins the vote given that it was a candidate. To do this, you will have to calculate the number times that each map was listed as a candidate (Map1 or Map2) and earned more votes than the other candidate. As part of this, you should consider whether a given map won the vote by getting more votes than the other option or if it was selected since it was `Map1` and the vote was a tie. You should include a table in your report showing the name of the map, the number of times it was a candidate, the number of times it won the vote, and the proportion/probability. You should also include a visualization of the results. Then, write a clear answer to the research question. There might be some data quality issues (such as misspelled map names and extra (trailing) blanks in some entries) to solve for this problem. You can find the proper names/spellings in the CODMaps.csv file. To full receive full credit, you must write code to solve these issues rather than editing the .csv files.
+
+
+
+Also find the attached csv files that are explained below:
+
+1. CODGames_p1_380.csv contains information about the results of an online, first-person shooter video game. (Games such as Call of Duty, Fortnite, Apex Legends, Battlefield has been immensely popular in the last 5 years.) The dataset contains information about a single player, who we will call Player 1. In the game, the player is part of a team trying to win an online match against other online competitors. Points are earned for various tasks such as eliminating enemy combatants, collecting items, capturing a location, etc. Each row represents the results of a single, randomly selected, online match in which Player 1 participated. o NOTE: When reading in this dataset, make sure the variables names are Map1, Map2, Choice, etc. instead of V1, V2, … o We have seen this issue before. To solve it, click the box for Yes for Heading in the Import Dataset interface. o This is not the same dataset used in the mini-projects and may require additional cleaning.
+
+
+
+2. CODGames_p2_380.csv is similar to CODGames_p1.csv but is for a different player, who we will call Player 2. o You will want to combine the information in this dataset with the information in CODGames_p1_380.csv into one dataset.
+
+
+
+3. CODMaps.csv contains information about the various maps available in the game. The dataset contains 3 variables: o Name – The name of the map/battleground o FirstAvailable – The event during which the map become available (Launch, Season 1, Season 2, etc.) o Date – The date on which the map become available
+
+
+
+Solve the Research Question: Which maps are the most likely to win the map vote when they are an option?</code></pre>
+<p>Note that the model responded in python, a language I am adept in and
+understand, but I realize that it is not really the intention of this
+class so I tried to get Gemini to turn it into R code. It does seem that
+Gemini converted the code to R, but it could not run it and I am hence
+stuck with the python run.</p>
+<p>In attempt to do this I gave Gemini the following prompts of</p>
+<pre><code>Please provide the code in R</code></pre>
+<p>and</p>
+<pre><code>Provide the visualization as well in R</code></pre>
+</div>
+<div id="results" class="section level3">
+<h3>Results</h3>
+<div id="gemini-give-the-following-plan-and-approach" class="section level4">
+<h4>Gemini give the following plan and approach</h4>
+<p>Plan and Approach</p>
+<p>To answer the research question regarding which maps are most likely
+to win a vote, I first combined the game data from both players
+(CODGames_p1_380.csv and CODGames_p2_380.csv) into a single dataset. A
+significant challenge in this analysis was data quality; specifically,
+the map names contained numerous spelling errors and inconsistencies
+(e.g., “Ruah” for “Rush”, “Collateral Striek” for “Collateral Strike”,
+and trailing whitespace like “Jungle”). I addressed this by cleaning the
+map names in the game data, using the CODMaps.csv file as a reference
+for correct spellings and mapping identified typos to their canonical
+names.</p>
+<p>For the calculations, I defined a map as a “candidate” if it appeared
+in either the Map1 or Map2 columns. To determine the win probability, I
+analyzed the MapVote and Choice columns. I discovered that the MapVote
+column consistently formats votes as “Winner’s Vote count to Loser’s
+Vote count” (e.g., “5 to 0” always, never “0 to 5”). Using this, I
+calculated two metrics:</p>
+<p>Strict Wins: The number of times a map earned a strict majority of
+votes (Vote_Winner &gt; Vote_Loser).</p>
+<p>Total Wins: The number of times a map was the final Choice, which
+includes both strict majorities and instances where the map won via the
+tie-breaker rule (where Map1 wins if votes are equal). The final
+probability presented is the Total Win Rate (Total Wins / Candidacies),
+as this represents the true likelihood of a map being played, but the
+analysis effectively distinguishes between popularity (strict votes) and
+systemic advantage (tie-breakers).</p>
+<pre class="python"><code>import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load datasets
+df1 = pd.read_csv(&#39;CODGames_p1_380.csv&#39;)
+df2 = pd.read_csv(&#39;CODGames_p2_380.csv&#39;)
+cod_maps = pd.read_csv(&#39;CODMaps.csv&#39;)
+
+# Combine game data
+combined_df = pd.concat([df1, df2], ignore_index=True)
+
+# Standardize Map Names
+clean_map_names = set(cod_maps[&#39;Name&#39;].str.strip().unique())
+
+def clean_name(name):
+    if pd.isna(name):
+        return name
+    name = str(name).strip()
+    
+    # Correction dictionary for identified typos
+    corrections = {
+        &#39;Ruah&#39;: &#39;Rush&#39;, &#39;Riad&#39;: &#39;Raid&#39;, &#39;Raid &#39;: &#39;Raid&#39;,
+        &#39;Collateral Striek&#39;: &#39;Collateral Strike&#39;, &#39;Collaterol Strike&#39;: &#39;Collateral Strike&#39;,
+        &#39;Collaterel Strike&#39;: &#39;Collateral Strike&#39;, &#39;Collateral&#39;: &#39;Collateral Strike&#39;,
+        &#39;Deisel&#39;: &#39;Diesel&#39;, &#39;Deprogam&#39;: &#39;Deprogram&#39;,
+        &#39;Apocolypse&#39;: &#39;Apocalypse&#39;, &#39;APocalypse&#39;: &#39;Apocalypse&#39;,
+        &#39;yamantau&#39;: &#39;Yamantau&#39;, &#39;Miami Stirke&#39;: &#39;Miami Strike&#39;,
+        &#39;Miami Sstrike&#39;: &#39;Miami Strike&#39;, &#39;Amrada Strike&#39;: &#39;Armada Strike&#39;,
+        &#39;Drive-in&#39;: &#39;Drive-In&#39;, &quot;Nuketown &#39;84 Halloween&quot;: &quot;Nuketown &#39;84&quot;,
+        &#39;Jungle &#39;: &#39;Jungle&#39;, &#39;Rush &#39;: &#39;Rush&#39;, &#39;Zoo &#39;: &#39;Zoo&#39;, &#39;Miami &#39;: &#39;Miami&#39;
+    }
+    
+    if name in corrections:
+        return corrections[name]
+    
+    # Case insensitive match
+    for valid in clean_map_names:
+        if name.lower() == valid.lower():
+            return valid
+    return name
+
+# Apply cleaning
+combined_df[&#39;Map1&#39;] = combined_df[&#39;Map1&#39;].apply(clean_name)
+combined_df[&#39;Map2&#39;] = combined_df[&#39;Map2&#39;].apply(clean_name)
+combined_df[&#39;Choice&#39;] = combined_df[&#39;Choice&#39;].apply(clean_name)
+
+# Filter for valid voting scenarios
+vote_df = combined_df.dropna(subset=[&#39;Map1&#39;, &#39;Map2&#39;]).copy()
+
+# Parse MapVote: Data inspection revealed format is &quot;WinnerVotes to LoserVotes&quot;
+def parse_votes(vote_str):
+    try:
+        parts = str(vote_str).lower().split(&#39; to &#39;)
+        return int(parts[0]), int(parts[1])
+    except:
+        return 0, 0
+
+vote_df[[&#39;Vote1&#39;, &#39;Vote2&#39;]] = vote_df[&#39;MapVote&#39;].apply(lambda x: pd.Series(parse_votes(x)))
+
+# Calculate Statistics
+unique_candidates = pd.unique(vote_df[[&#39;Map1&#39;, &#39;Map2&#39;]].values.ravel(&#39;K&#39;))
+map_stats = {}
+
+for map_name in unique_candidates:
+    # Candidacy Count
+    candidates = vote_df[(vote_df[&#39;Map1&#39;] == map_name) | (vote_df[&#39;Map2&#39;] == map_name)]
+    candidate_count = len(candidates)
+    
+    if candidate_count == 0:
+        continue
+        
+    # Wins (Official Choice)
+    wins_df = candidates[candidates[&#39;Choice&#39;] == map_name]
+    total_wins = len(wins_df)
+    
+    # Strict Wins (Winner Votes &gt; Loser Votes)
+    # Since Vote1 is always &gt;= Vote2, a strict win is simply when Vote1 != Vote2
+    strict_wins = len(wins_df[wins_df[&#39;Vote1&#39;] &gt; wins_df[&#39;Vote2&#39;]])
+    
+    map_stats[map_name] = {
+        &#39;Candidates&#39;: candidate_count,
+        &#39;Total_Wins&#39;: total_wins,
+        &#39;Strict_Wins&#39;: strict_wins,
+        &#39;Win_Rate&#39;: total_wins / candidate_count
+    }
+
+# Create DataFrame
+final_stats = pd.DataFrame.from_dict(map_stats, orient=&#39;index&#39;)
+final_stats = final_stats.sort_values(&#39;Win_Rate&#39;, ascending=False)
+final_stats.index.name = &#39;MapName&#39;
+final_stats = final_stats.reset_index()
+
+# Visualization
+sns.set(style=&quot;whitegrid&quot;)
+plt.figure(figsize=(10, 8))
+plot_data = final_stats.copy().sort_values(&#39;Win_Rate&#39;, ascending=True)
+plot_data[&#39;Tie_Win_Rate&#39;] = plot_data[&#39;Win_Rate&#39;] - (plot_data[&#39;Strict_Wins&#39;] / plot_data[&#39;Candidates&#39;])
+plot_data[&#39;Strict_Win_Rate_Calc&#39;] = plot_data[&#39;Strict_Wins&#39;] / plot_data[&#39;Candidates&#39;]
+
+p1 = plt.barh(plot_data[&#39;MapName&#39;], plot_data[&#39;Strict_Win_Rate_Calc&#39;], color=&#39;skyblue&#39;, label=&#39;Strict Majority Win&#39;)
+p2 = plt.barh(plot_data[&#39;MapName&#39;], plot_data[&#39;Tie_Win_Rate&#39;], left=plot_data[&#39;Strict_Win_Rate_Calc&#39;], color=&#39;salmon&#39;, label=&#39;Tie Breaker Win&#39;)
+
+plt.xlabel(&#39;Win Probability&#39;)
+plt.ylabel(&#39;Map Name&#39;)
+plt.title(&#39;Probability of Winning Map Vote&#39;)
+plt.legend()
+plt.tight_layout()
+plt.savefig(&#39;map_vote_probability.png&#39;)</code></pre>
+<p>Answer to Research Question</p>
+<p>Based on the analysis of the voting data, Nuketown ’84 is the map
+most likely to win the map vote, winning 82.5% of the time it is
+presented as a candidate. It is followed by Crossroads Strike (77.6%)
+and Raid (75.0%).</p>
+<p>It is worth noting that Nuketown ’84 benefits significantly from the
+tie-breaker rule; while it has a strict majority win rate of 70%, its
+total win rate jumps to 82.5% because it wins tied votes when it appears
+as Map1. In contrast, maps like Crossroads Strike rely almost entirely
+on strict popularity (majority votes) for their wins. The least likely
+maps to win are Miami (12.0%) and Echelon (17.8%).</p>
+</div>
+<div id="interpretation-of-python-version" class="section level4">
+<h4>Interpretation of Python Version</h4>
+<p>The code seems to do data cleaning in fixing the map names. The
+cleaning names do look familiar to me so that part looks right.</p>
+<p>The code then seems to “Parse MapVote” for trying to find voting
+tallys like I did. The AI gave the interpretation that: Data inspection
+revealed format is “WinnerVotes to LoserVotes”. THIS IS WRONG. As I
+noted in my part, I found that the delimiter was inconsistent with
+WinnerVotes to LoserVotes sometimes dropping the t in ‘to’. The way they
+got around this way by thinking that anything that didn’t follow that
+pattern is just an invalid entry and hence should be treated like 0 to
+0, which is WRONG and likely going to give some wrong proportions.</p>
+<p>They then calculated the statistics quite like how I did in my
+approach where they found unique map names and summed them.</p>
+<p>They then came up with the following visualization</p>
+<div class="float">
+<img role="img" aria-label="Gemini 3.0 Results Table" src="%22Gemini_ImagesQ2/ResultsTable.png%22" alt="Gemini 3.0 Results Table" />
+<div class="figcaption">Gemini 3.0 Results Table</div>
+</div>
+<div class="float">
+<img role="img" aria-label="Gemini 3.0 Results Visualization" src="%22Gemini_ImagesQ2/ResultsVisualization.png%22" alt="Gemini 3.0 Results Visualization" />
+<div class="figcaption">Gemini 3.0 Results Visualization</div>
+</div>
+</div>
+</div>
 </div>
 <div id="task-3" class="section level2">
 <h2>Task #3</h2>

@@ -313,6 +313,335 @@ Looking mostly at the table since it is easier to look through since it is arran
 
 ## Task #2
 
+For this question I used the AI model of Gemini 3.0
+
+You may find the exact prompt and reponses from Gemini at the following link: <https://gemini.google.com/share/7c470706e207>
+
+### Prompts
+
+The first prompt that I gave R was as follows:
+
+NOTE: I also provided Gemini with the csv files of CODGames_p1_380.csv, CODGames_p2_380.csv, and CODMaps.csv
+
+```
+Consider the following
+
+
+
+Relevant Information: Prior to each online match, players in the game lobby are presented with two options for the battlefield of the upcoming game (`Map1` and `Map2`). The players have the option to vote, and the resulting vote is recorded in the `MapVote` column. The winning map is listed in the `Choice` column. In the event of a tie vote, the map listed in `Map1` is chosen. (Games for which the player entered the lobby after the vote has taken place have no information in `Map1` and `Map2` but have the winning map presented in `Choice`.) Research Question: Which maps are the most likely to win the map vote when they are an option? Notes: To answer this question, write a paragraph (or more) discussing how you plan to answer this question. Be sure to address the data quality issues mentioned below and discuss how you will do the calculations. Then, write code and answer the question. (If I must answer questions about your approach/decision making process by reading your code rather than your discussion, you will lose points.) As part of your solution, you should calculate the proportion/probability that a map wins the vote given that it was a candidate. To do this, you will have to calculate the number times that each map was listed as a candidate (Map1 or Map2) and earned more votes than the other candidate. As part of this, you should consider whether a given map won the vote by getting more votes than the other option or if it was selected since it was `Map1` and the vote was a tie. You should include a table in your report showing the name of the map, the number of times it was a candidate, the number of times it won the vote, and the proportion/probability. You should also include a visualization of the results. Then, write a clear answer to the research question. There might be some data quality issues (such as misspelled map names and extra (trailing) blanks in some entries) to solve for this problem. You can find the proper names/spellings in the CODMaps.csv file. To full receive full credit, you must write code to solve these issues rather than editing the .csv files.
+
+
+
+Also find the attached csv files that are explained below:
+
+1. CODGames_p1_380.csv contains information about the results of an online, first-person shooter video game. (Games such as Call of Duty, Fortnite, Apex Legends, Battlefield has been immensely popular in the last 5 years.) The dataset contains information about a single player, who we will call Player 1. In the game, the player is part of a team trying to win an online match against other online competitors. Points are earned for various tasks such as eliminating enemy combatants, collecting items, capturing a location, etc. Each row represents the results of a single, randomly selected, online match in which Player 1 participated. o NOTE: When reading in this dataset, make sure the variables names are Map1, Map2, Choice, etc. instead of V1, V2, … o We have seen this issue before. To solve it, click the box for Yes for Heading in the Import Dataset interface. o This is not the same dataset used in the mini-projects and may require additional cleaning.
+
+
+
+2. CODGames_p2_380.csv is similar to CODGames_p1.csv but is for a different player, who we will call Player 2. o You will want to combine the information in this dataset with the information in CODGames_p1_380.csv into one dataset.
+
+
+
+3. CODMaps.csv contains information about the various maps available in the game. The dataset contains 3 variables: o Name – The name of the map/battleground o FirstAvailable – The event during which the map become available (Launch, Season 1, Season 2, etc.) o Date – The date on which the map become available
+
+
+
+Solve the Research Question: Which maps are the most likely to win the map vote when they are an option?
+```
+
+Note that the model responded in python, a language I am adept in and understand, but I realize that it is not really the intention of this class so I tried to get Gemini to turn it into R code. It does seem that Gemini converted the code to R, but it could not run it and I am hence stuck with the python run.
+
+In attempt to do this I gave Gemini the following prompts of
+
+```
+Please provide the code in R
+```
+
+and
+
+```
+Provide the visualization as well in R
+```
+
+### Results
+
+#### Gemini give the following plan and approach
+
+Plan and Approach
+
+To answer the research question regarding which maps are most likely to win a vote, I first combined the game data from both players (CODGames_p1_380.csv and CODGames_p2_380.csv) into a single dataset. A significant challenge in this analysis was data quality; specifically, the map names contained numerous spelling errors and inconsistencies (e.g., "Ruah" for "Rush", "Collateral Striek" for "Collateral Strike", and trailing whitespace like "Jungle "). I addressed this by cleaning the map names in the game data, using the CODMaps.csv file as a reference for correct spellings and mapping identified typos to their canonical names.
+
+For the calculations, I defined a map as a "candidate" if it appeared in either the Map1 or Map2 columns. To determine the win probability, I analyzed the MapVote and Choice columns. I discovered that the MapVote column consistently formats votes as "Winner's Vote count to Loser's Vote count" (e.g., "5 to 0" always, never "0 to 5"). Using this, I calculated two metrics:
+
+Strict Wins: The number of times a map earned a strict majority of votes (Vote_Winner > Vote_Loser).
+
+Total Wins: The number of times a map was the final Choice, which includes both strict majorities and instances where the map won via the tie-breaker rule (where Map1 wins if votes are equal). The final probability presented is the Total Win Rate (Total Wins / Candidacies), as this represents the true likelihood of a map being played, but the analysis effectively distinguishes between popularity (strict votes) and systemic advantage (tie-breakers).
+
+```{python eval = FALSE}
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load datasets
+df1 = pd.read_csv('CODGames_p1_380.csv')
+df2 = pd.read_csv('CODGames_p2_380.csv')
+cod_maps = pd.read_csv('CODMaps.csv')
+
+# Combine game data
+combined_df = pd.concat([df1, df2], ignore_index=True)
+
+# Standardize Map Names
+clean_map_names = set(cod_maps['Name'].str.strip().unique())
+
+def clean_name(name):
+    if pd.isna(name):
+        return name
+    name = str(name).strip()
+    
+    # Correction dictionary for identified typos
+    corrections = {
+        'Ruah': 'Rush', 'Riad': 'Raid', 'Raid ': 'Raid',
+        'Collateral Striek': 'Collateral Strike', 'Collaterol Strike': 'Collateral Strike',
+        'Collaterel Strike': 'Collateral Strike', 'Collateral': 'Collateral Strike',
+        'Deisel': 'Diesel', 'Deprogam': 'Deprogram',
+        'Apocolypse': 'Apocalypse', 'APocalypse': 'Apocalypse',
+        'yamantau': 'Yamantau', 'Miami Stirke': 'Miami Strike',
+        'Miami Sstrike': 'Miami Strike', 'Amrada Strike': 'Armada Strike',
+        'Drive-in': 'Drive-In', "Nuketown '84 Halloween": "Nuketown '84",
+        'Jungle ': 'Jungle', 'Rush ': 'Rush', 'Zoo ': 'Zoo', 'Miami ': 'Miami'
+    }
+    
+    if name in corrections:
+        return corrections[name]
+    
+    # Case insensitive match
+    for valid in clean_map_names:
+        if name.lower() == valid.lower():
+            return valid
+    return name
+
+# Apply cleaning
+combined_df['Map1'] = combined_df['Map1'].apply(clean_name)
+combined_df['Map2'] = combined_df['Map2'].apply(clean_name)
+combined_df['Choice'] = combined_df['Choice'].apply(clean_name)
+
+# Filter for valid voting scenarios
+vote_df = combined_df.dropna(subset=['Map1', 'Map2']).copy()
+
+# Parse MapVote: Data inspection revealed format is "WinnerVotes to LoserVotes"
+def parse_votes(vote_str):
+    try:
+        parts = str(vote_str).lower().split(' to ')
+        return int(parts[0]), int(parts[1])
+    except:
+        return 0, 0
+
+vote_df[['Vote1', 'Vote2']] = vote_df['MapVote'].apply(lambda x: pd.Series(parse_votes(x)))
+
+# Calculate Statistics
+unique_candidates = pd.unique(vote_df[['Map1', 'Map2']].values.ravel('K'))
+map_stats = {}
+
+for map_name in unique_candidates:
+    # Candidacy Count
+    candidates = vote_df[(vote_df['Map1'] == map_name) | (vote_df['Map2'] == map_name)]
+    candidate_count = len(candidates)
+    
+    if candidate_count == 0:
+        continue
+        
+    # Wins (Official Choice)
+    wins_df = candidates[candidates['Choice'] == map_name]
+    total_wins = len(wins_df)
+    
+    # Strict Wins (Winner Votes > Loser Votes)
+    # Since Vote1 is always >= Vote2, a strict win is simply when Vote1 != Vote2
+    strict_wins = len(wins_df[wins_df['Vote1'] > wins_df['Vote2']])
+    
+    map_stats[map_name] = {
+        'Candidates': candidate_count,
+        'Total_Wins': total_wins,
+        'Strict_Wins': strict_wins,
+        'Win_Rate': total_wins / candidate_count
+    }
+
+# Create DataFrame
+final_stats = pd.DataFrame.from_dict(map_stats, orient='index')
+final_stats = final_stats.sort_values('Win_Rate', ascending=False)
+final_stats.index.name = 'MapName'
+final_stats = final_stats.reset_index()
+
+# Visualization
+sns.set(style="whitegrid")
+plt.figure(figsize=(10, 8))
+plot_data = final_stats.copy().sort_values('Win_Rate', ascending=True)
+plot_data['Tie_Win_Rate'] = plot_data['Win_Rate'] - (plot_data['Strict_Wins'] / plot_data['Candidates'])
+plot_data['Strict_Win_Rate_Calc'] = plot_data['Strict_Wins'] / plot_data['Candidates']
+
+p1 = plt.barh(plot_data['MapName'], plot_data['Strict_Win_Rate_Calc'], color='skyblue', label='Strict Majority Win')
+p2 = plt.barh(plot_data['MapName'], plot_data['Tie_Win_Rate'], left=plot_data['Strict_Win_Rate_Calc'], color='salmon', label='Tie Breaker Win')
+
+plt.xlabel('Win Probability')
+plt.ylabel('Map Name')
+plt.title('Probability of Winning Map Vote')
+plt.legend()
+plt.tight_layout()
+plt.savefig('map_vote_probability.png')
+```
+
+Answer to Research Question
+
+Based on the analysis of the voting data, Nuketown '84 is the map most likely to win the map vote, winning 82.5% of the time it is presented as a candidate. It is followed by Crossroads Strike (77.6%) and Raid (75.0%).
+
+It is worth noting that Nuketown '84 benefits significantly from the tie-breaker rule; while it has a strict majority win rate of 70%, its total win rate jumps to 82.5% because it wins tied votes when it appears as Map1. In contrast, maps like Crossroads Strike rely almost entirely on strict popularity (majority votes) for their wins. The least likely maps to win are Miami (12.0%) and Echelon (17.8%).
+
+#### Interpretation of Python Version
+
+The code seems to do data cleaning in fixing the map names. The cleaning names do look familiar to me so that part looks right.
+
+The code then seems to "Parse MapVote" for trying to find voting tallys like I did. The AI gave the interpretation that: Data inspection revealed format is "WinnerVotes to LoserVotes". THIS IS WRONG. As I noted in my part, I found that the delimiter was inconsistent with WinnerVotes to LoserVotes sometimes dropping the t in 'to'. The way they got around this way by thinking that anything that didn't follow that pattern is just an invalid entry and hence should be treated like 0 to 0, which is WRONG and likely going to give some wrong proportions.
+
+Gemini then calculated the statistics quite like how I did in my approach where they found unique map names and summed them.
+
+Gemini then came up with the following visualizations:
+
+![Gemini 3.0 Results Visualization](Gemini_ImagesQ2/ResultsVisualization.png)
+
+![Gemini 3.0 Results Table](Gemini_ImagesQ2/ResultsTable.png)
+
+My results from Task 1 are (reducing rows to top ten to be consistent with Gemini):
+
+```{r}
+CandicacyMap %>% head(10) %>% kable()
+
+# For the axis labels layer, I took that line from my (Ishan) Mini-Project 1
+ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
+  geom_col(color = "black", fill = "forestgreen") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + # Note this line was taken from: https://www.statology.org/rotate-axis-labels-ggplot2/
+  xlab("Map Name") +
+  ylab("Proportion of Times Winning Map Vote") +
+  ggtitle("Proportion a Map wins a Map Vote when an Option")
+```
+
+Comparing the tables, the proportions are simply incorrect since according to the research question we need proportions to represent when they win a vote, where the Gemini table is including when it ties (which is WRONG as it is not conforming to the research question, below paragraph explains). As a consequence of that, looking at their total candidates, the numbers are larger than mine due to the fact that I removed ties as potential candidates while they did not. One thing that is similar across both our results are the number of strict wins though, take Nuketown where we both found 28 strict wins and crossroads where we both found 41 strict wins.
+
+As a result of their candidate blunder, Gemini has a central problem with their visualization. They are considering strict wins across candidates including those that tie. To further provide an explanation of why that is wrong, we must consider the fact that the research question is asking: Which maps are the most likely to win the map vote when they are an option? To include ties, Gemini is stating that a map won the map vote, rather than being tied in the map vote. If a map is tied in a map vote then its candidacy is the result of not a win, but an arbitrary choice by the game. Hence we cannot consider those games in determining strict wins.
+
+### Interpretation of R Version
+
+For this classes purposes, I had Gemini turn the python code into R code. Note Gemini could not run the code but it apparently mirrors the python code.
+
+```{r}
+# 1. Load Data
+df1 <- read_csv("Raw Data/CODGames_p1_380.csv", show_col_types = FALSE) # I CHANGED FILE PATHS
+df2 <- read_csv("Raw Data/CODGames_p2_380.csv", show_col_types = FALSE)
+maps_ref <- read_csv("Raw Data/CODMaps.csv", show_col_types = FALSE)
+
+# Combine datasets
+combined_df <- bind_rows(df1, df2)
+
+# 2. Data Cleaning
+# Define a function to clean map names using standard dplyr approaches
+clean_map_name <- function(name) {
+  name <- str_trim(name) # Remove trailing/leading whitespace
+  
+  case_when(
+    # Fix known typos
+    name == "Ruah" ~ "Rush",
+    name == "Riad" | name == "Raid " ~ "Raid",
+    name %in% c("Collateral Striek", "Collaterol Strike", "Collaterel Strike", "Collateral") ~ "Collateral Strike",
+    name == "Deisel" ~ "Diesel",
+    name == "Deprogam" ~ "Deprogram",
+    name %in% c("Apocolypse", "APocalypse") ~ "Apocalypse",
+    name == "yamantau" ~ "Yamantau",
+    name %in% c("Miami Stirke", "Miami Sstrike") ~ "Miami Strike",
+    name == "Amrada Strike" ~ "Armada Strike",
+    name == "Drive-in" ~ "Drive-In",
+    name == "Nuketown '84 Halloween" ~ "Nuketown '84",
+    # Default: keep original name if no correction needed
+    TRUE ~ name
+  )
+}
+
+# Apply cleaning to relevant columns
+clean_df <- combined_df %>%
+  mutate(
+    Map1 = clean_map_name(Map1),
+    Map2 = clean_map_name(Map2),
+    Choice = clean_map_name(Choice)
+  ) %>%
+  # Filter to rows where a vote actually occurred (Map1 and Map2 are not NA)
+  filter(!is.na(Map1) & !is.na(Map2))
+
+# 3. Calculations
+# First, calculate how many times each map was a candidate
+candidates_count <- clean_df %>%
+  select(Map1, Map2) %>%
+  pivot_longer(cols = everything(), values_to = "MapName") %>%
+  count(MapName, name = "Candidates")
+
+# Next, calculate how many times each map won (was the Choice)
+wins_count <- clean_df %>%
+  count(Choice, name = "Total_Wins") %>%
+  rename(MapName = Choice)
+
+# Optional: Calculate Strict Wins vs Tie Wins for deeper analysis
+# Parse the MapVote column "X to Y"
+vote_analysis <- clean_df %>%
+  separate(MapVote, into = c("Vote_Win", "Vote_Loss"), sep = " to ", convert = TRUE) %>%
+  mutate(
+    # A strict win is when the votes are not equal
+    Is_Strict_Win = Vote_Win > Vote_Loss,
+    # A tie win is when votes are equal (Winner determined by Map1 position)
+    Is_Tie_Win = Vote_Win == Vote_Loss
+  ) %>%
+  group_by(Choice) %>%
+  summarise(
+    Strict_Wins = sum(Is_Strict_Win, na.rm = TRUE),
+    Tie_Wins = sum(Is_Tie_Win, na.rm = TRUE)
+  ) %>%
+  rename(MapName = Choice)
+
+# Merge all statistics
+final_stats <- candidates_count %>%
+  left_join(wins_count, by = "MapName") %>%
+  left_join(vote_analysis, by = "MapName") %>%
+  replace_na(list(Total_Wins = 0, Strict_Wins = 0, Tie_Wins = 0)) %>%
+  mutate(
+    Probability = Total_Wins / Candidates,
+    Strict_Prob = Strict_Wins / Candidates
+  ) %>%
+  arrange(desc(Probability))
+
+# 4. Display Table
+print(as.data.frame(final_stats))
+
+# 5. Visualization
+ggplot(final_stats, aes(x = reorder(MapName, Probability), y = Probability)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Probability of Winning Map Vote",
+    x = "Map Name",
+    y = "Probability (Win Rate)"
+  ) +
+  theme_minimal()
+```
+
+Ok so when I saw the R code in Gemini, I did not really expect the R code to run, which is why I was planning on interpreting the python code mainly. So this is a great surprise!
+
+In this code Gemini follows the structure of Data Cleaning -> Calculations. They clean the data by stripping whitespace and then going through and fixing the typos. That is likely more efficient of a process than I did as I manually went through each of them. A notable oversight in their data cleaning is that they did a filter to remove NAs, when there are no NAs in the data but rather "". I don't know if this is accounted for in the code but it doesn't seem to impact strict wins indicating that R somehow ignores them.
+
+The difference that Gemini did that is better than my code is with the data cleaning that they fixed inconsistencies with what I think is something like a python dictionary. This is more efficient as for my data cleaning I was doing searches on the entire dataframe for each inconsistency. By doing it by like a python dictionary, Gemini is simply going through the dataframe only once for each entry rather than going through the dataframe each time for each inconsistency. Although Big O notation wouldn't care (O(n)), my method is notably a little more complex.
+
+The difference that Gemini has in their Calculations is with how they calculate the statistics, rather than using summarize statements, Gemini uses a `pivot_longer` and `count` function to calculate the counts. I can't really speak to complexity because I don't know R's algorithm composition but I believe what I am doing is essentially the same process. Gemini also uses a `separate` statement with a delimiter as " to " to separate the wins votes from loss votes. As such, Gemini cannot properly account for " o " delimiters. What Gemini does that is similar to me is use a summarize and group by after they have separated the entries to combine the results.
+
+I have already spoke about my displeasure with how they calculate their probabilities in the python interpretation.
+
+### Overall Results
+
+I can't really say with confidence that the AI's solution outside of data cleaning, complexity-wise, is better than mine. Doing a comparison of processes, we both combine datasets using rbind. We both perform data cleaning manual esque and this is the only place they beat me complexity wise, (they beat me in using a space stripping command and doing cleaning in a python dictionary type manner). The Calculation part ends up being kind of the same complexity wise as well, where they use different commands but we end up with the same overall result in strict wins. With regards to amount of code, I was simply more verbose in my calculations where I showed each step. Otherwise we have pretty much the same amount of overall code lines. A notable oversight that the AI had was that they included ties in their calculations for Map Vote Wins, where ties should not be counted because if a map is tied in a map vote then its candidacy is the result of not a win, but an arbitrary choice by the game. That is the winning point for my code, otherwise Gemini's data cleaning is superior.
+
 ## Task #3
 
 ## Task #4
