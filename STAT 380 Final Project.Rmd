@@ -74,7 +74,7 @@ Looking at the dataset overview, I see no concerns as 839 observations = 589 obs
 
 The research question for this task is: Which maps are the most likely to win the map vote when they are an option?
 
-According to the relevant information part of the instruction guide, players are given two choices represented in the `Map1` and `Map2` variables. There also is a `MapVote` variable which shows the voting tally and can also serve as a filter of that which there are no player votes. The winning map vote is then placed in the `Choice` variable. Also according to the problem guidance, there is data quality issues. Focusing on the variables above, the first step I must take is to fix the data quality issues. To address this I will first look at if there are missing values in any of these columns and likely remove them. Then I shall at each of the unique data observations to see if there is spelling issues. I will validate this by looking at the differences between the CODMaps Names that are apparently all correct. Note: I do recognize that we: "should consider whether a given map won the vote by getting more votes than the other option or if it was selected since it was `Map1` and the vote was a tie." It is evident from the research question that we need to consider maps that win the map vote. If a map did not win as a result of a map vote, that is outside the scope of our research question and therefore all blank entries as well as ties must be removed. That should alleviate data quality concerns hopefully. The second step would then be to use the hint given in the document to make a: "table in your report showing the name of the map, the number of times it was a candidate, the number of times it won the vote, and the proportion/probability." The number of times a map appears as a candidate and number of times it won are simply a matter of making the data into a 0 or 1, or True or False thing of is it a map name and then simply summing across respective column. As such, the answer to the research question should be based on that proportion/probability of how many times a map won its vote. The most likely is a subjective number where I will simply present a table of the proportions from largest to smallest where the viewer can be like I consider this many to be the most likely number of maps.
+According to the relevant information part of the instruction guide, players are given two choices represented in the `Map1` and `Map2` variables. There also is a `MapVote` variable which shows the voting tally and can also serve as a filter of that which there are no player votes. The winning map vote is then placed in the `Choice` variable. Also according to the problem guidance, there is data quality issues. Focusing on the variables above, the first step I must take is to fix the data quality issues. To address this I will first look at if there are missing values in any of these columns and likely remove them. Then I shall at each of the unique data observations to see if there is spelling issues. I will validate this by looking at the differences between the CODMaps Names that are apparently all correct. Note: I do recognize that we: "should consider whether a given map won the vote by getting more votes than the other option or if it was selected since it was `Map1` and the vote was a tie." It is evident from the research question that we need to consider maps that win the map vote. If a map did not win as a result of a map vote, that is not considered a win by our research question and therefore all blank entries as well as ties must be denoted as losses. That can be done by making an indicator variable of tie or not tie. That should alleviate data quality concerns hopefully. The second step would then be to use the hint given in the document to make a: "table in your report showing the name of the map, the number of times it was a candidate, the number of times it won the vote, and the proportion/probability." The number of times a map appears as a candidate and number of times it won are simply a matter of making the data into a 0 or 1, or True or False thing of is it a map name and then simply summing across respective column. As such, the answer to the research question should be based on that proportion/probability of how many times a map won its vote. The most likely is a subjective number where I will simply present a table of the proportions from largest to smallest where the viewer can be like I consider this many to be the most likely number of maps.
 
 ### Data Cleaning
 
@@ -214,21 +214,26 @@ unique(CODGamesAllPlayersCleaned$MapVote)
 
 There does not seem to be any missing votes here so I can proceed to removing Ties, however, I do see that in some of them there is an inconsistent delimiter. I can see a pattern though that there is only single digit votes and therefore the numbers I need are the first character and the last character.
 
-I realistically do not care who wins the vote and only care if the first and last numbers are the same. So there is no need to store the numbers and I will just do a comparison in a filter. I have no clue how to get the first and last characters of a string in R because in python it would be intuitive as a string is an iterable and I could index at 0 and -1 but for whatever reason R is not the same :(. I therefore searched how do I get the first and last letter of a string in r on google and got the str_sub function from tidyverse as the solution.
+I realistically do not care who wins the vote and only care if the first and last numbers are the same. So there is no need to store the numbers and I will just do a comparison in an ifelse and set the indicator based on that (`tieIndicator` = 1 if tie, 0 otherwise). I have no clue how to get the first and last characters of a string in R because in python it would be intuitive as a string is an iterable and I could index at 0 and -1 but for whatever reason R is not the same :(. I therefore searched how do I get the first and last letter of a string in r on google and got the str_sub function from tidyverse as the solution.
 
 ```{r}
 CODGamesAllPlayersCleaned <-
   CODGamesAllPlayersCleaned %>%
-  filter(
-    str_sub(CODGamesAllPlayersCleaned$MapVote, 1, 1) !=
-      str_sub(CODGamesAllPlayersCleaned$MapVote, -1, -1)
+  mutate(
+    tieIndicator = ifelse(
+      str_sub(CODGamesAllPlayersCleaned$MapVote, 1, 1) != str_sub(CODGamesAllPlayersCleaned$MapVote, -1, -1),
+      0,
+      1)
     )
 ```
 
 Checking if it worked
 
 ```{r}
-unique(CODGamesAllPlayersCleaned$MapVote)
+CODGamesAllPlayersCleaned %>%
+  select(MapVote, tieIndicator) %>%
+  head(10) %>%
+  kable()
 ```
 
 It worked, yay!
@@ -260,25 +265,17 @@ CandicacyMap <-
 CandicacyMap %>% kable()
 ```
 
-Now I need to get the number of times a map won from `Choice`. This is also probably through summarize but I'll just directly join it.
+Now I need to get the number of times a map won from `Choice` and is not a tie from `tieIndicator`. This is also probably through summarize but I'll just directly join it.
 
 ```{r}
 CandicacyMap <- 
   full_join(
     CandicacyMap,
-    CODGamesAllPlayersCleaned %>% group_by(Choice) %>% summarize(NumberOfSelections = n()),
+    CODGamesAllPlayersCleaned %>% filter(tieIndicator == 0) %>% group_by(Choice) %>% summarize(NumberOfSelections = n()),
     by = join_by(MapName == Choice)
   )
 
 CandicacyMap %>% kable()
-```
-
-To validate whether this is done correctly, it must be noted that the number of selections must be half that of the candidacies. I can't really check otherwise except manually if there is actual matches but I am like trusting in myself and my algorithmic design skills that that part is correct.
-
-If the below is TRUE, I am declaring validation!
-
-```{r}
-sum(CandicacyMap$TotalCandidacies) / 2 == sum(CandicacyMap$NumberOfSelections)
 ```
 
 Yay!
@@ -309,7 +306,7 @@ ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
 
 ### Research Question Answer
 
-Looking mostly at the table since it is easier to look through since it is arranged, it looks like `Nuketown ’84` is the most likely to be picked, followed by `Raid`, followed by `Crossroads Strike`, continue this train of thought till you reach your desired however many is the likely number you would like.
+Looking mostly at the table since it is easier to look through since it is cleanly arranged, it looks like `Nuketown ’84` is the most likely to be picked, followed by `Raid`, followed by `Crossroads Strike`, continue this train of thought till you reach your desired however many is the likely number you would like.
 
 ## Task #2
 
@@ -365,7 +362,7 @@ Provide the visualization as well in R
 
 ### Results
 
-#### Gemini give the following plan and approach
+#### Gemini gives the following plan and approach
 
 Plan and Approach
 
@@ -499,7 +496,7 @@ It is worth noting that Nuketown '84 benefits significantly from the tie-breaker
 
 The code seems to do data cleaning in fixing the map names. The cleaning names do look familiar to me so that part looks right.
 
-The code then seems to "Parse MapVote" for trying to find voting tallys like I did. The AI gave the interpretation that: Data inspection revealed format is "WinnerVotes to LoserVotes". THIS IS WRONG. As I noted in my part, I found that the delimiter was inconsistent with WinnerVotes to LoserVotes sometimes dropping the t in 'to'. The way they got around this way by thinking that anything that didn't follow that pattern is just an invalid entry and hence should be treated like 0 to 0, which is WRONG and likely going to give some wrong proportions.
+The code then seems to "Parse MapVote" for trying to find voting tallys like I did. The AI gave the interpretation that: Data inspection revealed format is "WinnerVotes to LoserVotes". THIS IS WRONG. As I noted in my part, I found that the delimiter was inconsistent with WinnerVotes to LoserVotes sometimes dropping the t in 'to'. The way they got around this way by thinking that anything that didn't follow that pattern is just an invalid entry and hence should be treated like 0 to 0, which is WRONG and is going to give some wrong proportions.
 
 Gemini then calculated the statistics quite like how I did in my approach where they found unique map names and summed them.
 
@@ -509,23 +506,34 @@ Gemini then came up with the following visualizations:
 
 ![Gemini 3.0 Results Table](Gemini_ImagesQ2/ResultsTable.png)
 
-My results from Task 1 are (reducing rows to top ten to be consistent with Gemini):
+My results from Task 1 are:
 
 ```{r}
-CandicacyMap %>% head(10) %>% kable()
-
-# For the axis labels layer, I took that line from my (Ishan) Mini-Project 1
-ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
-  geom_col(color = "black", fill = "forestgreen") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + # Note this line was taken from: https://www.statology.org/rotate-axis-labels-ggplot2/
-  xlab("Map Name") +
-  ylab("Proportion of Times Winning Map Vote") +
-  ggtitle("Proportion a Map wins a Map Vote when an Option")
+CandicacyMap %>% kable()
 ```
 
-Comparing the tables, the proportions are simply incorrect since according to the research question we need proportions to represent when they win a vote, where the Gemini table is including when it ties (which is WRONG as it is not conforming to the research question, below paragraph explains). As a consequence of that, looking at their total candidates, the numbers are larger than mine due to the fact that I removed ties as potential candidates while they did not. One thing that is similar across both our results are the number of strict wins though, take Nuketown where we both found 28 strict wins and crossroads where we both found 41 strict wins.
+Comparing the tables, the proportions are simply incorrect since according to the research question we need proportions to represent when they win a vote, where the Gemini table is including when it ties (which is WRONG as it is not conforming to the research question and they should be displaying and ranking by strict wins / candidates).
 
-As a result of their candidate blunder, Gemini has a central problem with their visualization. They are considering strict wins across candidates including those that tie. To further provide an explanation of why that is wrong, we must consider the fact that the research question is asking: Which maps are the most likely to win the map vote when they are an option? To include ties, Gemini is stating that a map won the map vote, rather than being tied in the map vote. If a map is tied in a map vote then its candidacy is the result of not a win, but an arbitrary choice by the game. Hence we cannot consider those games in determining strict wins.
+Note that as I identified above, the delimiter is different for some entries. One thing that is similar across both our results are the number of strict wins and total candidacies, take Nuketown where we both found 28 strict wins 40 selections, or crossroads where we both found 41 strict wins and 58 candidacies. To see if I can identify which are those which should cause problems I will try to find the rows and compare the map names in Gemini and my tables.
+
+```{r}
+unique(CODGamesAllPlayersCleaned$MapVote)
+```
+
+The inconsistent delimiters are "4 o 0" and "2 o 0", which are clearly not tie votes as Gemini would count them.
+
+Now to check the rows for these
+
+```{r}
+CODGamesAllPlayersCleaned %>%
+  select(Map1, Map2, Choice, MapVote) %>%
+  filter(MapVote == "4 o 0" | MapVote == "2 o 0") %>%
+  kable()
+```
+
+It seems there is only one misspelling per each of those options hence I shall directly look for Diesel and Garrison to see if they have one less win because they consider it those battles a tie when they in fact not.
+
+Unfortunately Garrison is not in the top ten table provided by Gemini, BUT Diesel is present. As can be seen in the table, Gemini says Diesel has 37 strict wins, while my table has Diesel with 38 wins. Indicating that the delimiter issue I brought up is a validated concern.
 
 ### Interpretation of R Version
 
@@ -632,15 +640,26 @@ Ok so when I saw the R code in Gemini, I did not really expect the R code to run
 
 In this code Gemini follows the structure of Data Cleaning -> Calculations. They clean the data by stripping whitespace and then going through and fixing the typos. That is likely more efficient of a process than I did as I manually went through each of them. A notable oversight in their data cleaning is that they did a filter to remove NAs, when there are no NAs in the data but rather "". I don't know if this is accounted for in the code but it doesn't seem to impact strict wins indicating that R somehow ignores them.
 
-The difference that Gemini did that is better than my code is with the data cleaning that they fixed inconsistencies with what I think is something like a python dictionary. This is more efficient as for my data cleaning I was doing searches on the entire dataframe for each inconsistency. By doing it by like a python dictionary, Gemini is simply going through the dataframe only once for each entry rather than going through the dataframe each time for each inconsistency. Although Big O notation wouldn't care (O(n)), my method is notably a little more complex.
+The difference that Gemini did that is better than my code is with the data cleaning that they fixed inconsistencies with what I think is something like a python dictionary. This is more efficient as for my data cleaning I was doing search and replace on the entire dataframe for every single inconsistency. By doing it by like a python dictionary, Gemini is simply going through the dataframe only once for each entry rather than going through the dataframe each time for each inconsistency. Although Big O notation wouldn't care (O(n)), my method is a little more complex.
 
 The difference that Gemini has in their Calculations is with how they calculate the statistics, rather than using summarize statements, Gemini uses a `pivot_longer` and `count` function to calculate the counts. I can't really speak to complexity because I don't know R's algorithm composition but I believe what I am doing is essentially the same process. Gemini also uses a `separate` statement with a delimiter as " to " to separate the wins votes from loss votes. As such, Gemini cannot properly account for " o " delimiters. What Gemini does that is similar to me is use a summarize and group by after they have separated the entries to combine the results.
 
-I have already spoke about my displeasure with how they calculate their probabilities in the python interpretation.
+To have a side by side analysis of the data tables, I will do a join on the similar columns, and make indicators for if the variables are the same (1 if same, 0 otherwise). If selections and candidacies are the same, or one or the other is the same, we must have the same proportions.
+
+```{r}
+CandicacyMap %>%
+  full_join(final_stats %>% select(MapName, Strict_Wins, Candidates, Strict_Prob),
+            by = join_by(MapName)) %>%
+  mutate(selectionSame = ifelse(NumberOfSelections == Strict_Wins, 1, 0),
+         candidaciesSame = ifelse(TotalCandidacies == Candidates, 1, 0)) %>%
+  kable()
+```
+
+As I've identified in the python interpretation section, Diesel and Garrison should have one less strict win on Gemini's answer because of the delimiter issue. As seen in my code, this concern is validated in the side-by-side comparison as you can see the selectionSame indicator has a 0 value in the Diesel and Garrison rows; this also makes the proportions different by mathematical properties since the number of candidacies are the same.
 
 ### Overall Results
 
-I can't really say with confidence that the AI's solution outside of data cleaning, complexity-wise, is better than mine. Doing a comparison of processes, we both combine datasets using rbind. We both perform data cleaning manual esque and this is the only place they beat me complexity wise, (they beat me in using a space stripping command and doing cleaning in a python dictionary type manner). The Calculation part ends up being kind of the same complexity wise as well, where they use different commands but we end up with the same overall result in strict wins. With regards to amount of code, I was simply more verbose in my calculations where I showed each step. Otherwise we have pretty much the same amount of overall code lines. A notable oversight that the AI had was that they included ties in their calculations for Map Vote Wins, where ties should not be counted because if a map is tied in a map vote then its candidacy is the result of not a win, but an arbitrary choice by the game. That is the winning point for my code, otherwise Gemini's data cleaning is superior.
+Firstly, the AI's solution is wrong due to the fact that it cannot handle the inconsistent delimiter present in the MapVote variable. Complexity-wise, I can't really say with confidence that the AI's solution outside of data cleaning, is better than mine. Doing a comparison of processes, we both combine datasets using rbind. We both perform data cleaning where I do a manual cleaning and this is the only place they beat me complexity wise, (they beat me in using a space stripping command and doing cleaning in a python dictionary type manner). The Calculation part ends up being kind of the same complexity wise as well, where they use different commands but we end up with the same overall result in strict wins (adjusting for delimiter differences). With regards to amount of code, I was simply more verbose in my calculations where I showed each step. Otherwise we have pretty much the same amount of overall code lines. In short, my solution is correct while Gemini's is not, however complexity wise we were mostly the same except for data cleaning where it beat me.
 
 ## Task #3
 
