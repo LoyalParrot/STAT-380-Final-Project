@@ -663,4 +663,174 @@ Firstly, the AI's solution is wrong due to the fact that it cannot handle the in
 
 ## Task #3
 
+How does the game type affect `TotalXP` after accounting for the `Score`?
+
+To start to answer this question, we first need to check our values for `GameType`.
+
+```{r}
+unique(CODGamesAllPlayers$GameType)
+```
+
+Let's make the HC and non-HC versions of the game types the same.
+
+```{r}
+CODGamesAllPlayers$GameType[CODGamesAllPlayers$GameType == "HC - TDM"] <- "TDM"
+CODGamesAllPlayers$GameType[CODGamesAllPlayers$GameType == "HC - Kill Confirmed"] <- "Kill Confirmed"
+CODGamesAllPlayers$GameType[CODGamesAllPlayers$GameType == "HC - Hardpoint"] <- "Hardpoint"
+CODGamesAllPlayers$GameType[CODGamesAllPlayers$GameType == "HC - Domination"] <- "Domination"
+```
+
+Making sure it works.
+
+```{r}
+unique(CODGamesAllPlayers$GameType)
+```
+
+Now that our data is cleaned, let's look at the distributions of `GameType`, `TotalXP`, and `Score`.
+
+### GameType
+
+```{r}
+ggplot(CODGamesAllPlayers, mapping = aes(x = GameType)) +
+  geom_bar(color = "black", fill = "lightblue") +
+  xlab("Game Type") +
+  ggtitle("Distribution of Game Type")
+```
+
+```{r}
+gametype_counts <- table(CODGamesAllPlayers$GameType)
+gametype_percentages <- (gametype_counts / length(CODGamesAllPlayers$GameType))
+sum(is.na(CODGamesAllPlayers$GameType))
+```
+```{r}
+gametype_counts
+```
+```{r}
+gametype_percentages
+```
+
+`GameType` is a categorical variable. It represents the game type for a certain match. It has no missing values. As shown in the table and graph output, TDM and Hardpoint are the two most common game types, representing 64.00% and 31.82% of all matches.
+
+### TotalXP
+
+```{r}
+CODGamesAllPlayers %>%
+  summarise(N = sum(!is.na(TotalXP)),
+             XPMin = min(TotalXP, na.rm = TRUE),
+             XPQ1 = quantile(TotalXP, 0.25, na.rm = TRUE),
+             XPMedian = median(TotalXP, na.rm = TRUE),
+             XPMean = mean(TotalXP, na.rm = TRUE),
+             XPQ3 = quantile(TotalXP, 0.75, na.rm = TRUE),
+             XPMax = max(TotalXP, na.rm = TRUE),
+             XPSD = sd(TotalXP, na.rm = TRUE),
+             XPNA = sum(is.na(TotalXP))
+             )
+```
+
+```{r}
+ggplot(CODGamesAllPlayers, aes(x = TotalXP)) +
+  geom_histogram(fill = "lightblue", color = "black")
+```
+
+
+The variable `TotalXP` is a quantitative variable. It represents the total experience points a player gained during a match. It has 31 missing values. It contains 808 valid records. The average `TotalXP` is about 15477, standard deviation is 6970, ranging from 1935 to 45310. The distribution of the data in the graph is slightly skewed to the right, with values concentrated within the range of 9000 to 15000.
+
+### Score
+
+```{r}
+CODGamesAllPlayers %>%
+  summarise(N = sum(!is.na(Score)),
+             ScoreMin = min(Score, na.rm = TRUE),
+             ScoreQ1 = quantile(Score, 0.25, na.rm = TRUE),
+             ScoreMedian = median(Score, na.rm = TRUE),
+             ScoreMean = mean(Score, na.rm = TRUE),
+             ScoreQ3 = quantile(Score, 0.75, na.rm = TRUE),
+             ScoreMax = max(Score, na.rm = TRUE),
+             ScoreSD = sd(Score, na.rm = TRUE),
+             ScoreNA = sum(is.na(Score))
+             )
+```
+
+```{r}
+ggplot(CODGamesAllPlayers, aes(x = Score)) +
+  geom_histogram(fill = "lightblue", color = "black")
+```
+
+The variable `Score` is a quantitative variable. It represents the score a player achieved during a match. It has 31 missing values. It contains 808 valid records. The average `Score` is about 3000, standard deviation is about 1400, ranging from 100 to 9734. The distribution of the data in the graph is slightly skewed to the right, with values concentrated within the range of 2000 to 3000.
+
+### Score and TotalXP
+
+```{r}
+ggplot(data = CODGamesAllPlayers, mapping = aes(x = Score, y = TotalXP)) +
+  geom_point()
+```
+
+```{r}
+cor(CODGamesAllPlayers$Score, CODGamesAllPlayers$TotalXP, use = "complete.obs")
+```
+
+```{r}
+cov(CODGamesAllPlayers$Score, CODGamesAllPlayers$TotalXP, use = "complete.obs")
+```
+
+```{r}
+model <- lm(TotalXP ~ Score, data = CODGamesAllPlayers)
+summary(model)
+```
+
+The calculated correlation and covariance metrics between `Score` and `TotalXP` both indicate that the relationship is positive and linear. Because the correlation’s value is around 0.5, we know that the relationship is moderately strong, while the covariance’s magnitude is influenced by the units. By creating a regression line for the variables, we can see that as `Score` increases by 1 point, `TotalXP` increases by 2.74.
+
+### GameType and TotalXP
+
+```{r}
+ggplot(data = CODGamesAllPlayers, mapping = aes(x = GameType, y = TotalXP)) +
+  geom_boxplot()
+```
+
+```{r}
+CODGamesAllPlayers %>%
+  group_by(GameType) %>%
+  summarise(
+    min = min(TotalXP, na.rm = TRUE),
+    firstq = quantile(TotalXP, 0.25, na.rm = TRUE),
+    median = median(TotalXP, na.rm = TRUE),
+    mean = mean(TotalXP, na.rm = TRUE),
+    thirdq = quantile(TotalXP, 0.75, na.rm = TRUE),
+    max = max(TotalXP, na.rm = TRUE)
+  )
+```
+
+
+The side-by-side boxplot shows that Domination has the highest median `TotalXP`, followed by Hardpoint, TDM, and Kill Confirmed. Compared to the other game types, Kill Confirmed has a very small interquartile range. TDM is the game type with the most outliers.
+
+### GameType and Score
+
+```{r}
+ggplot(data = CODGamesAllPlayers, mapping = aes(x = GameType, y = Score)) +
+  geom_boxplot()
+```
+
+```{r}
+CODGamesAllPlayers %>%
+  group_by(GameType) %>%
+  summarise(
+    min = min(Score, na.rm = TRUE),
+    firstq = quantile(Score, 0.25, na.rm = TRUE),
+    median = median(Score, na.rm = TRUE),
+    mean = mean(Score, na.rm = TRUE),
+    thirdq = quantile(Score, 0.75, na.rm = TRUE),
+    max = max(Score, na.rm = TRUE)
+  )
+```
+
+
+The side-by-side boxplot shows that Domination has the highest median `Score`, followed by Hardpoint, TDM, and Kill Confirmed. Compared to the other game types, Domination has a very small interquartile range. The distributions for Hardpoint and TDM are almost identical based on the boxplots.
+
+```{r}
+task3_model <- lm(TotalXP ~ Score + GameType, data = CODGamesAllPlayers)
+summary(task3_model)
+```
+
+Players in the Hardpoint `GameType` are expected to have, on average, 121.7613 more `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change. Players in the Kill Confirmed `GameType` are expected to have, on average, 3703.1728 less `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change. Players in the TDM `GameType` are expected to have, on average, 2570.4367 less `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change.
+
 ## Task #4
