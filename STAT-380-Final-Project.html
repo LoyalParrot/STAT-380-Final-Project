@@ -2587,11 +2587,11 @@ place they beat me complexity wise, (they beat me in using a space
 stripping command and doing cleaning in a python dictionary type
 manner). The Calculation part ends up being kind of the same complexity
 wise as well, where they use different commands but we end up with the
-same overall result in strict wins (adjusting for delimiter
-differences). With regards to amount of code, I was simply more verbose
-in my calculations where I showed each step. Otherwise we have pretty
-much the same amount of overall code lines. In short, my solution is
-correct while Gemini’s is not, however complexity wise we were mostly
+same overall result in strict wins (adjusting for delimiter differences)
+and in candidacies. With regards to amount of code, I was simply more
+verbose in my calculations where I showed each step. Otherwise we have
+pretty much the same amount of overall code lines. In short, my solution
+is correct while Gemini’s is not, however complexity wise we were mostly
 the same except for data cleaning where it beat me.</p>
 </div>
 </div>
@@ -3117,11 +3117,11 @@ cm_rf &lt;- table(Predicted = pred_rf, Observed = valid4$Result)
 cm_rf</code></pre>
 <pre><code>##          Observed
 ## Predicted Loss Win
-##      Loss   32  17
-##      Win    29  51</code></pre>
+##      Loss   33  17
+##      Win    28  51</code></pre>
 <pre class="r"><code>acc_rf &lt;- sum(diag(cm_rf)) / sum(cm_rf)
 acc_rf</code></pre>
-<pre><code>## [1] 0.6434109</code></pre>
+<pre><code>## [1] 0.6511628</code></pre>
 <pre class="r"><code>rf_model$importance</code></pre>
 <pre><code>##                        Loss           Win MeanDecreaseAccuracy MeanDecreaseGini
 ## Eliminations   0.0186431602  0.0060872448         1.170665e-02        38.917282
@@ -3296,7 +3296,7 @@ better overall.</p>
 results</code></pre>
 <pre><code>##                 Model  Accuracy       AUC
 ## 1 Logistic Regression 0.6356589 0.6429605
-## 2       Random Forest 0.6434109        NA
+## 2       Random Forest 0.6511628        NA
 ## 3           SVM (RBF) 0.6744186 0.7292671</code></pre>
 <div id="final-conclusions-based-on-results" class="section level4">
 <h4>Final Conclusions Based On Results:</h4>
