@@ -24,19 +24,19 @@ library(e1071)
 
 
 # Dataset Read-in
-# CODModes <- read.csv("Raw Data/CODGameModes.csv")
-# CODGamesP1 <- read.csv("Raw Data/CODGames_p1_380.csv")
-# CODGamesP2 <- read.csv("Raw Data/CODGames_p2_380.csv")
-# CODMaps <- read.csv("Raw Data/CODMaps.csv")
+CODModes <- read.csv("Raw Data/CODGameModes.csv")
+CODGamesP1 <- read.csv("Raw Data/CODGames_p1_380.csv")
+CODGamesP2 <- read.csv("Raw Data/CODGames_p2_380.csv")
+CODMaps <- read.csv("Raw Data/CODMaps.csv")
 
-# Noah's base path (Windows)
-noah_path <- "C:/Users/Noah/Downloads"
-
-# Dataset Read-in (files are directly in Downloads)
-CODModes   <- read.csv(file.path(noah_path, "CODGameModes.csv"))
-CODGamesP1 <- read.csv(file.path(noah_path, "CODGames_p1_380.csv"))
-CODGamesP2 <- read.csv(file.path(noah_path, "CODGames_p2_380.csv"))
-CODMaps    <- read.csv(file.path(noah_path, "CODMaps.csv"))
+# # Noah's base path (Windows)
+# noah_path <- "C:/Users/Noah/Downloads"
+# 
+# # Dataset Read-in (files are directly in Downloads)
+# CODModes   <- read.csv(file.path(noah_path, "CODGameModes.csv"))
+# CODGamesP1 <- read.csv(file.path(noah_path, "CODGames_p1_380.csv"))
+# CODGamesP2 <- read.csv(file.path(noah_path, "CODGames_p2_380.csv"))
+# CODMaps    <- read.csv(file.path(noah_path, "CODMaps.csv"))
 ```
 
 ## Quick Dataset Checking
@@ -553,7 +553,7 @@ Unfortunately Garrison is not in the top ten table provided by Gemini, BUT Diese
 
 For this classes purposes, I had Gemini turn the python code into R code. Note Gemini could not run the code but it apparently mirrors the python code.
 
-```{r, eval=FALSE}
+```{r}
 # 1. Load Data
 df1 <- read_csv("Raw Data/CODGames_p1_380.csv", show_col_types = FALSE) # I CHANGED FILE PATHS
 df2 <- read_csv("Raw Data/CODGames_p2_380.csv", show_col_types = FALSE)
@@ -658,9 +658,9 @@ The difference that Gemini did that is better than my code is with the data clea
 
 The difference that Gemini has in their Calculations is with how they calculate the statistics, rather than using summarize statements, Gemini uses a `pivot_longer` and `count` function to calculate the counts. I can't really speak to complexity because I don't know R's algorithm composition but I believe what I am doing is essentially the same process. Gemini also uses a `separate` statement with a delimiter as " to " to separate the wins votes from loss votes. As such, Gemini cannot properly account for " o " delimiters. What Gemini does that is similar to me is use a summarize and group by after they have separated the entries to combine the results.
 
-To have a side by side analysis of the data tables, I will do a join on the similar columns, and make indicators for if the variables are the same (1 if same, 0 otherwise). If selections and candidacies are the same, or one or the other is the same, we must have the same proportions.
+To have a side by side analysis of the data tables, I will do a join on the similar columns, and make indicators for if the variables are the same (1 if same, 0 otherwise). If selections and candidacies are the same, we must have the same proportions. If one of metrics is the same and the other is different then we must have different proportions (unless it is an identity).
 
-```{r, eval=FALSE}
+```{r}
 CandicacyMap %>%
   full_join(final_stats %>% select(MapName, Strict_Wins, Candidates, Strict_Prob),
             by = join_by(MapName)) %>%
