@@ -1559,10 +1559,11 @@ ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
 <div id="research-question-answer" class="section level3">
 <h3>Research Question Answer</h3>
 <p>Looking mostly at the table since it is easier to look through since
-it is cleanly arranged, it looks like <code>Nuketown ’84</code> is the
-most likely to be picked, followed by <code>Raid</code>, followed by
-<code>Crossroads Strike</code>, continue this train of thought till you
-reach your desired however many is the likely number you would like.</p>
+it is cleanly arranged, it looks like <code>Raid</code> is the most
+likely to be picked, followed by <code>Crossroads Strike</code>,
+followed by <code>Nuketown ’84</code>, continue this train of thought
+till you reach your desired however many is the likely number you would
+like.</p>
 </div>
 </div>
 <div id="task-2" class="section level2">
@@ -3117,11 +3118,11 @@ cm_rf &lt;- table(Predicted = pred_rf, Observed = valid4$Result)
 cm_rf</code></pre>
 <pre><code>##          Observed
 ## Predicted Loss Win
-##      Loss   33  17
-##      Win    28  51</code></pre>
+##      Loss   32  17
+##      Win    29  51</code></pre>
 <pre class="r"><code>acc_rf &lt;- sum(diag(cm_rf)) / sum(cm_rf)
 acc_rf</code></pre>
-<pre><code>## [1] 0.6511628</code></pre>
+<pre><code>## [1] 0.6434109</code></pre>
 <pre class="r"><code>rf_model$importance</code></pre>
 <pre><code>##                        Loss           Win MeanDecreaseAccuracy MeanDecreaseGini
 ## Eliminations   0.0186431602  0.0060872448         1.170665e-02        38.917282
@@ -3296,7 +3297,7 @@ better overall.</p>
 results</code></pre>
 <pre><code>##                 Model  Accuracy       AUC
 ## 1 Logistic Regression 0.6356589 0.6429605
-## 2       Random Forest 0.6511628        NA
+## 2       Random Forest 0.6434109        NA
 ## 3           SVM (RBF) 0.6744186 0.7292671</code></pre>
 <div id="final-conclusions-based-on-results" class="section level4">
 <h4>Final Conclusions Based On Results:</h4>

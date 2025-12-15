@@ -320,7 +320,7 @@ ggplot(CandicacyMap, aes(MapName, ProportionOfSelection)) +
 
 ### Research Question Answer
 
-Looking mostly at the table since it is easier to look through since it is cleanly arranged, it looks like `Nuketown ’84` is the most likely to be picked, followed by `Raid`, followed by `Crossroads Strike`, continue this train of thought till you reach your desired however many is the likely number you would like.
+Looking mostly at the table since it is easier to look through since it is cleanly arranged, it looks like `Raid` is the most likely to be picked, followed by `Crossroads Strike`, followed by `Nuketown ’84`, continue this train of thought till you reach your desired however many is the likely number you would like.
 
 ## Task #2
 
