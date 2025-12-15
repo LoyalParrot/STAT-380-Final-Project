@@ -15,14 +15,28 @@ knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 
 # Libraries
+library(dplyr)
 library(tidyverse)
 library(kableExtra)
+library(randomForest)
+library(pROC)
+library(e1071)
+
 
 # Dataset Read-in
-CODModes <- read.csv("Raw Data/CODGameModes.csv")
-CODGamesP1 <- read.csv("Raw Data/CODGames_p1_380.csv")
-CODGamesP2 <- read.csv("Raw Data/CODGames_p2_380.csv")
-CODMaps <- read.csv("Raw Data/CODMaps.csv")
+# CODModes <- read.csv("Raw Data/CODGameModes.csv")
+# CODGamesP1 <- read.csv("Raw Data/CODGames_p1_380.csv")
+# CODGamesP2 <- read.csv("Raw Data/CODGames_p2_380.csv")
+# CODMaps <- read.csv("Raw Data/CODMaps.csv")
+
+# Noah's base path (Windows)
+noah_path <- "C:/Users/Noah/Downloads"
+
+# Dataset Read-in (files are directly in Downloads)
+CODModes   <- read.csv(file.path(noah_path, "CODGameModes.csv"))
+CODGamesP1 <- read.csv(file.path(noah_path, "CODGames_p1_380.csv"))
+CODGamesP2 <- read.csv(file.path(noah_path, "CODGames_p2_380.csv"))
+CODMaps    <- read.csv(file.path(noah_path, "CODMaps.csv"))
 ```
 
 ## Quick Dataset Checking
@@ -539,7 +553,7 @@ Unfortunately Garrison is not in the top ten table provided by Gemini, BUT Diese
 
 For this classes purposes, I had Gemini turn the python code into R code. Note Gemini could not run the code but it apparently mirrors the python code.
 
-```{r}
+```{r, eval=FALSE}
 # 1. Load Data
 df1 <- read_csv("Raw Data/CODGames_p1_380.csv", show_col_types = FALSE) # I CHANGED FILE PATHS
 df2 <- read_csv("Raw Data/CODGames_p2_380.csv", show_col_types = FALSE)
@@ -646,7 +660,7 @@ The difference that Gemini has in their Calculations is with how they calculate 
 
 To have a side by side analysis of the data tables, I will do a join on the similar columns, and make indicators for if the variables are the same (1 if same, 0 otherwise). If selections and candidacies are the same, or one or the other is the same, we must have the same proportions.
 
-```{r}
+```{r, eval=FALSE}
 CandicacyMap %>%
   full_join(final_stats %>% select(MapName, Strict_Wins, Candidates, Strict_Prob),
             by = join_by(MapName)) %>%
@@ -833,4 +847,297 @@ summary(task3_model)
 
 Players in the Hardpoint `GameType` are expected to have, on average, 121.7613 more `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change. Players in the Kill Confirmed `GameType` are expected to have, on average, 3703.1728 less `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change. Players in the TDM `GameType` are expected to have, on average, 2570.4367 less `TotalXP` than players in the Domination `GameType`, assuming that `Score` does not change.
 
+
+
+
 ## Task #4
+
+### Research Question:
+
+What is the best predictive accuracy achievable (using an 80/20 validation split) for Logistic Regression, Random Forest, and Support Vector Machine (SVM) when predicting whether a player wins their Call of Duty match using only: Eliminations, Deaths, Damage, DidPlayerVote (Yes/No), PrimaryWeapon, XPType, and GameType?
+
+### Decision Made / Data Setup (Response + Features)
+
+The original Result column is stored as a score string (ex: "100-97"). I converted this to a binary outcome by splitting the two scores and defining Win when the first score is larger and Loss otherwise.
+
+As mentioned, only the predictors listed in the research question are used. I restricted predictors to exactly the variables listed in the question to keep the comparison fair and also to eliminate variables which I personally thought would be uninformative about a players chance of winning like the date, map (since both teams have to use the same map), etc. I used Ishan's earlier dataframe of "CodGamesAllPlayersCleaned" because it was previously cleaned and adjusted to make sure all games have the necessary info and all players participated. All categorical variables were converted to factors including "DidPlayerVote," "PrimaryWeapon," "XPType," and "GameType." Lastly, I did not factor out partial games as they were still a large part of the dataset and I think it was important to consider them, as many games I have played were partial/not completed and the my personal goal with this research question is to have the best predictive accuracy for any game not just full/partial.
+
+Going back to variable selection here is my reasoning for the 7 chosen variables:
+- Eliminations: If a player has more eliminations it seems like this would benefit their chance of winning by increasing their teams score more and quicker than their oponents
+- Deaths: If a player has more deaths it seems like they are getting eliminated more than they are eliminating opponents likely decreasing chances of winning
+- Damage: While eliminations and damage are likely very correlated, I think damage does a good job also representing a players impact as sometimes another player may help eliminate someone even though you did a ton of damage to them and thus that is why including damage likely will improve the models
+- DidPlayerVote: I think including this may seem random, but I think that if a player is voting they are more likely to have an opinion on the map due to them feeling like it may increase their chance of winning. Thus by voting and increasing the chances of getting a favorable map to them I think this could help increase the models' predictive accuracy
+- Primary Weapon: I think some weapons definitely help players more than others and could benefit certain playstyles leading to higher chance of winning
+- XPType: If a player has a higher xp boost during a game they may be incentivized to play better and harder and thus as a result higher win rates
+- GameType: While I am not familiar with the different gametypes, I'm sure they could definitely be beneficial to some players and not others based on gamestyle so that is why it was included in the model
+
+To ensure a fair comparison between methods, I used the same 80/20 training/validation split (seed = 123) for every model, and compared performance using validation accuracy (confusion matrix + accuracy). I also reported AUC when the method provides class probabilities, as a secondary metric for how well the model separates Win vs Loss across thresholds.  
+
+```{r}
+# Select variables
+task_4_dataframe <- CODGamesAllPlayersCleaned %>%
+  select(
+    Result,
+    Eliminations,
+    Deaths,
+    Damage,
+    DidPlayerVote,
+    PrimaryWeapon,
+    XPType,
+    GameType
+  ) %>%
+  drop_na()
+
+# Clean Result To Binary (Win / Loss)
+df4 <- task_4_dataframe %>%
+  separate(Result, into = c("TeamScore", "OppScore"), sep = "-", convert = TRUE) %>%
+  mutate(
+    Result = ifelse(TeamScore > OppScore, "Win", "Loss"),
+    Result = factor(Result)
+  ) %>%
+  select(-TeamScore, -OppScore)
+
+# Clean categorical variables
+task_4 <- df4 %>%
+  mutate(
+    DidPlayerVote = factor(DidPlayerVote),
+    PrimaryWeapon = factor(PrimaryWeapon),
+    XPType = factor(XPType),
+    GameType = factor(GameType)
+  )
+
+str(task_4)
+
+task_4 <- task_4 %>%
+  mutate(PrimaryWeapon = stringr::str_trim(as.character(PrimaryWeapon))) %>%
+  mutate(PrimaryWeapon = factor(PrimaryWeapon))
+```
+
+### Train / Validation Set Splitting
+
+```{r}
+set.seed(123)
+n <- nrow(task_4)
+train_index <- sample(1:n, size = floor(0.80 * n), replace = FALSE)
+
+train4 <- task_4[train_index, ]
+valid4 <- task_4[-train_index, ]
+
+set.seed(NULL)
+
+table(train4$Result)
+table(valid4$Result)
+```
+
+### Model #1 -> Logistic Regression
+
+Method overview: Logistic regression models the log-odds of winning as a linear function of the predictors. It outputs a predicted probability of Win, and I classified the result as Win when the probability was ≥ 0.5. I felt this is a good baseline because it is interpretable and to me makes sense since probabilities must sum to 1, so if you have a greater than or equal to 0.5 probability of winning, you automatically have at least as high of a chance (0.5) or higher chance than your opponents and thus I would classify that as Win (also personal bias but tie goes to the runner (baseball reference)).
+
+```{r}
+# Convert Result to numeric for logistic regression
+train4 <- train4 %>%
+  mutate(Result01 = ifelse(Result == "Win", 1, 0))
+
+valid4 <- valid4 %>%
+  mutate(Result01 = ifelse(Result == "Win", 1, 0))
+
+logit_model <- glm(
+  Result01 ~ Eliminations + Deaths + Damage +
+    DidPlayerVote + PrimaryWeapon + XPType + GameType,
+  data = train4,
+  family = binomial
+)
+
+summary(logit_model)
+```
+
+#### Logistic Regression Performance
+
+
+```{r}
+prob_logit <- predict(logit_model, newdata = valid4, type = "response")
+
+pred_logit <- ifelse(prob_logit >= 0.5, "Win", "Loss") %>%
+  factor(levels = c("Loss", "Win"))
+
+cm_logit <- table(Predicted = pred_logit, Observed = valid4$Result)
+cm_logit
+
+acc_logit <- sum(diag(cm_logit)) / sum(cm_logit)
+acc_logit
+
+roc_logit <- roc(valid4$Result01, prob_logit)
+auc_logit <- auc(roc_logit)
+auc_logit
+```
+
+#### Result Discussion: 
+
+On the validation set, Logistic Regression achieved an accuracy of 0.6357.  The confusion matrix showed it correctly predicted 48 wins and 34 losses, with 20 false losses and 27 false wins. I also checked ROC/AUC since logistic regression produced probabilities. The AUC was 0.643, which suggested the model only separated Wins vs Losses slightly better than random guessing.Overall, logistic regression did okay as a baseline, but the linear form (and lots of categorical levels) likely limited how much accuracy it could reach.
+
+
+
+
+### Model #2 --> Random Forest
+
+Method overview: Random Forest builds many classification trees on bootstrap samples and averages their predictions (majority vote). Each split uses a random subset of predictors, which reduces correlation between trees and improves generalization. I set importance = TRUE so I can interpret predictor importance using both MeanDecreaseAccuracy (out-of-bag permutation impact) and MeanDecreaseGini (total impurity reduction across splits) as mentioned in class. I also followed our in-class example of setting ntree to 500 as this likely is a large enough number to produce stability amoung results since such a large number of trrees is used and additional improvement is likely overfitting and marginal benefit of actual predictive accuracy is small (variance vs. bias trade-off / learning noise).
+
+
+```{r}
+set.seed(123)
+rf_model <- randomForest(
+  Result ~ Eliminations + Deaths + Damage +
+    DidPlayerVote + PrimaryWeapon + XPType + GameType,
+  data = train4,
+  ntree = 500,
+  mtry = floor(sqrt(7)),
+  importance = TRUE
+)
+set.seed(NULL)
+
+rf_model
+```
+
+
+#### Random Forest Performance
+
+```{r}
+pred_rf <- predict(rf_model, newdata = valid4)
+
+cm_rf <- table(Predicted = pred_rf, Observed = valid4$Result)
+cm_rf
+
+acc_rf <- sum(diag(cm_rf)) / sum(cm_rf)
+acc_rf
+
+rf_model$importance
+varImpPlot(rf_model)
+```
+
+
+### Random Forest Results:
+
+On the validation set, Random Forest achieved an accuracy of 0.6434. So in this case, it actually performed slightly worse than logistic regression on accuracy.
+
+Because I set importance = TRUE, I extracted importance using rf_model$importance, which returned both:
+
+- MeanDecreaseAccuracy (out-of-bag permutation importance — bigger = more important)
+- MeanDecreaseGini (total decrease in node impurity — bigger = more important)
+
+Deaths was the most important predictor by both metrics (MeanDecreaseAccuracy ≈ 0.0531, MeanDecreaseGini ≈ 61.50). Damage, PrimaryWeapon, and Eliminations were also major contributors (especially by Gini, with Damage ≈ 48.93 and PrimaryWeapon ≈ 45.95).
+
+This makes sense since deaths and eliminations directly reflected how well a player performed in the match, which strongly relates to whether the match ended in a win.
+
+
+
+
+### Model #3 --> SVM:
+
+Method overview: A Support Vector Machine finds a decision boundary that maximizes the margin between classes. With a nonlinear kernel (RBF), the SVM can capture nonlinear relationships by implicitly mapping predictors into a higher-dimensional space. Because SVMs are sensitive to scale, I standardized numeric predictors (and handled categorical predictors consistently) before fitting. I chose to use soft-margin SVM as it provided a cost parameter which allowed some observations to be misclassified which I thought would provide better generalization than using a hard-margin SVM model. I tuned the key hyperparameters (cost and gamma) using k-fold (by default in e1071 package its k = 10) cross-validation on the training set, then evaluated the final model on the original validation set.
+
+Reasoning: I chose SVM as I have previously implemented it in Python, so I wanted to see what it is like to implement it in R as well. I learned how to implement Soft and Hard SVM in a theoretical manner previously in CMPSC 448, so I went back to my notes on that from last semester and then filled my coding knowledge gaps using a mixture of resources including youtube and LLMs like ChatGPT and Gemini. I really enjoyed this part of the project as CMPSC 448 was very theoretical and background mathematically based, so actually implementing the code of SVM to a dataset was a fun and interesting challenge!
+
+```{r}
+# Scale numeric predictors (keeps factors untouched)
+train_svm <- train4 %>%
+  mutate(
+    Eliminations = as.numeric(scale(Eliminations)),
+    Deaths       = as.numeric(scale(Deaths)),
+    Damage       = as.numeric(scale(Damage))
+  )
+
+# IMPORTANT: scale validation using TRAIN means/sds (do it manually)
+scale_with_train <- function(x_train, x_valid) {
+  mu <- mean(x_train, na.rm = TRUE)
+  s  <- sd(x_train, na.rm = TRUE)
+  if (s == 0) s <- 1
+  (x_valid - mu) / s
+}
+
+valid_svm <- valid4 %>%
+  mutate(
+    Eliminations = scale_with_train(train4$Eliminations, Eliminations),
+    Deaths       = scale_with_train(train4$Deaths, Deaths),
+    Damage       = scale_with_train(train4$Damage, Damage)
+  )
+
+# Tune hyperparameters (training only)
+set.seed(123)
+svm_tuned <- tune(
+  svm,
+  Result ~ Eliminations + Deaths + Damage + DidPlayerVote + PrimaryWeapon + XPType + GameType,
+  data = train_svm,
+  kernel = "radial",
+  ranges = list(
+    cost = c(0.1, 1, 10, 100),
+    gamma = c(0.01, 0.1, 1)
+  )
+)
+set.seed(NULL)
+
+svm_tuned$best.parameters
+
+# Fit best SVM model (probability=TRUE so we can do AUC)
+svm_model <- svm(
+  Result ~ Eliminations + Deaths + Damage + DidPlayerVote + PrimaryWeapon + XPType + GameType,
+  data = train_svm,
+  kernel = "radial",
+  cost = svm_tuned$best.parameters$cost,
+  gamma = svm_tuned$best.parameters$gamma,
+  probability = TRUE
+)
+
+svm_model
+```
+
+#### SVM Performance:
+
+```{r}
+# Class predictions
+pred_svm <- predict(svm_model, newdata = valid_svm)
+
+cm_svm <- table(Predicted = pred_svm, Observed = valid4$Result)
+cm_svm
+
+acc_svm <- sum(diag(cm_svm)) / sum(cm_svm)
+acc_svm
+
+# Probabilities for AUC
+pred_svm_prob <- attr(
+  predict(svm_model, newdata = valid_svm, probability = TRUE),
+  "probabilities"
+)
+
+# "Win" probability column (make sure it exists)
+prob_svm_win <- pred_svm_prob[, "Win"]
+
+roc_svm <- roc(valid4$Result01, prob_svm_win)
+auc_svm <- auc(roc_svm)
+auc_svm
+```
+
+#### SVM RESULTS:
+
+On the validation set, the tuned SVM achieved an accuracy of 0.6744, which was the best accuracy of the three models. 
+
+The confusion matrix showed 47 correctly predicted wins and 40 correctly predicted losses, with 21 errors in each direction. The SVM AUC was 0.7295, which was noticeably higher than logistic regression. So not only did SVM have the best accuracy, it also ranked wins vs losses better overall.
+
+
+
+### FINAL MODELS COMPARISONS & CONCLUSIONS:
+
+```{r}
+results <- data.frame(
+  Model = c("Logistic Regression", "Random Forest", "SVM (RBF)"),
+  Accuracy = c(acc_logit, acc_rf, acc_svm),
+  AUC = c(as.numeric(auc_logit), NA, as.numeric(auc_svm))
+)
+
+results
+```
+
+
+#### Final Conclusions Based On Results:
+
+Across the three models, the best predictive accuracy came from SVM (RBF) with validation accuracy 0.6744. Logistic Regression came next at 0.6434, and Random Forest was 0.6279. SVM likely performed best because it could model a nonlinear boundary between Win and Loss using the RBF kernel, while logistic regression was restricted to a mostly linear structure. Random Forest did produce useful variable importance results (Deaths and Eliminations dominated), but in this specific split and feature set, it didn’t beat the other methods on validation accuracy. Further research could be done on many different seeds to see whether the predictive accuracy deviates from the sample accuracies found above as well as these results could be very seed dependent. 
+
